@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pandas
+numpy
+scipy
+yfinance
+pydantic
+python-dotenv
+httpx
