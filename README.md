@@ -12,34 +12,44 @@ A web application to back-test LEAP options strategies combined with equity posi
 ## Tech Stack
 - **Backend**: Python, FastAPI, Pandas, NumPy, SciPy (Black-Scholes Model), yfinance.
 - **Frontend**: React, Vite, Tailwind CSS, Chart.js.
+- **Experimental Frontend**: Marimo Notebook.
+- **Dependency Management**: uv.
 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.11+
 - Node.js 16+
+- uv (Python package manager)
 
-### Backend Setup
+### Backend Setup (using uv)
 1. Navigate to the backend directory:
    ```bash
    cd backend
    ```
-2. Create a virtual environment and activate it:
+2. Sync dependencies:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
+   uv sync
    ```
-3. Install dependencies:
+3. Run the server:
    ```bash
-   pip install -r requirements.txt
-   ```
-4. Run the server:
-   ```bash
-   uvicorn app.main:app --reload
+   uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
    The API will be available at `http://localhost:8000`.
 
-### Frontend Setup
+### Marimo Frontend (Lightweight)
+For quick experimentation and interactive visualization:
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Run the Marimo notebook:
+   ```bash
+   uv run marimo edit notebooks/dashboard.py
+   ```
+   This will open a browser window with the interactive dashboard.
+
+### React Frontend Setup
 1. Navigate to the frontend directory:
    ```bash
    cd frontend
@@ -55,7 +65,7 @@ A web application to back-test LEAP options strategies combined with equity posi
    The app will be available at `http://localhost:5173`.
 
 ## Usage
-1. Open the frontend in your browser.
+1. Open the frontend (React or Marimo) in your browser.
 2. Configure your strategy parameters (Target Equity, Allocation, LEAP details, Rebalancing rules).
-3. Click "Run Strategy Backtest".
+3. Click "Run Strategy Backtest" (or "Run Backtest" in Marimo).
 4. Analyze the results (Return, CAGR, Drawdown, Trade History).
