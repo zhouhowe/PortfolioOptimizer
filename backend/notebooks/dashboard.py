@@ -1,61 +1,60 @@
 import marimo
 
-__generated_with = "0.1.0"
+__generated_with = "0.19.4"
 app = marimo.App()
 
 
 @app.cell
-def __():
-    import marimo as mo
-    import pandas as pd
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from app.services.backtest import LeapStrategyBacktester
-    from app.models import BacktestRequest
+def _():
     import sys
     import os
 
-    # Ensure backend is in path
+    # Ensure backend is in path before importing app modules
+    # When running `marimo edit notebooks/dashboard.py` from `backend/` directory,
+    # os.getcwd() is `.../backend`.
     if os.getcwd() not in sys.path:
         sys.path.append(os.getcwd())
-    return (
-        BacktestRequest,
-        LeapStrategyBacktester,
-        mo,
-        np,
-        os,
-        pd,
-        plt,
-        sys,
-    )
-
-
-@app.cell
-def __(mo):
-    mo.md(
-        """
-        # Strategy Optimizer - Marimo Frontend
-        
-        This is a lightweight frontend for the Strategy Optimizer (P0).
-        """
-    )
     return
 
 
 @app.cell
-def __(mo):
+def _():
+    # Depend on os, sys to ensure path setup runs first
+    import marimo as mo
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # Import app modules after sys.path is updated
+    from app.services.backtest import LeapStrategyBacktester
+    from app.models import BacktestRequest
+    return BacktestRequest, LeapStrategyBacktester, mo, pd, plt
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    # Strategy Optimizer - Marimo Frontend
+
+    This is a lightweight frontend for the Strategy Optimizer (P0).
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
     # Inputs
     equity_symbol = mo.ui.dropdown(["QQQ", "TSLA", "SPY"], value="QQQ", label="Equity Symbol")
     initial_capital = mo.ui.number(value=100000, label="Initial Capital")
-    
+
     equity_alloc = mo.ui.slider(0, 100, value=60, label="Equity Allocation (%)")
     leap_alloc = mo.ui.slider(0, 100, value=30, label="LEAP Allocation (%)")
-    
+
     start_date = mo.ui.date(value="2020-01-01", label="Start Date")
     end_date = mo.ui.date(value="2023-12-31", label="End Date")
-    
+
     run_btn = mo.ui.run_button(label="Run Backtest")
-    
+
     mo.vstack([
         mo.hstack([equity_symbol, initial_capital]),
         mo.hstack([equity_alloc, leap_alloc]),
@@ -73,8 +72,8 @@ def __(mo):
     )
 
 
-@app.cell
-def __(
+@app.cell(hide_code=True)
+def _(
     BacktestRequest,
     LeapStrategyBacktester,
     end_date,
@@ -86,9 +85,11 @@ def __(
     pd,
     plt,
     run_btn,
+    start_date,
 ):
     # Execution Logic
     result = None
+    output = None
     if run_btn.value:
         try:
             req = BacktestRequest(
@@ -111,31 +112,31 @@ def __(
                 loss_limit_0m=10.0,
                 monthly_withdrawal=0.0
             )
-            
+
             backtester = LeapStrategyBacktester(req)
             result = backtester.run()
-            
+
             # Visualization
             df_history = pd.DataFrame([h.dict() for h in result.history])
-            
+
             # Plot
             fig, ax1 = plt.subplots(figsize=(10, 6))
-            
+
             color = 'tab:blue'
             ax1.set_xlabel('Date')
             ax1.set_ylabel('Portfolio Value', color=color)
             ax1.plot(pd.to_datetime(df_history['date']), df_history['total_value'], color=color)
             ax1.tick_params(axis='y', labelcolor=color)
-            
+
             ax2 = ax1.twinx() 
             color = 'tab:red'
             ax2.set_ylabel('Drawdown', color=color)
             ax2.plot(pd.to_datetime(df_history['date']), df_history['drawdown'], color=color, linestyle='--')
             ax2.tick_params(axis='y', labelcolor=color)
-            
+
             plt.title(f"Backtest Result: {equity_symbol.value}")
             fig.tight_layout()
-            
+
             # Stats
             stats = mo.md(
                 f"""
@@ -145,7 +146,7 @@ def __(
                 **Sharpe Ratio:** {result.sharpe_ratio}
                 """
             )
-            
+
             output = mo.vstack([
                 stats,
                 mo.as_html(fig)
@@ -154,20 +155,14 @@ def __(
             output = mo.md(f"**Error:** {str(e)}")
     else:
         output = mo.md("Click 'Run Backtest' to see results.")
-        
+
     output
-    return (
-        ax1,
-        ax2,
-        backtester,
-        color,
-        df_history,
-        fig,
-        output,
-        req,
-        result,
-        stats,
-    )
+    return
+
+
+@app.cell
+def _():
+    return
 
 
 if __name__ == "__main__":
