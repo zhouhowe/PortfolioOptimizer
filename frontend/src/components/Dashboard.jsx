@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Switch } from '@headlessui/react';
+import axios from 'axios';
 import clsx from 'clsx';
 
-const Dashboard = ({ onSubmit, isLoading }) => {
-  const [formData, setFormData] = useState({
+const Dashboard = ({ onSubmit, isLoading, initialData }) => {
+  const [formData, setFormData] = useState(initialData || {
     equity_symbol: 'QQQ',
     start_date: '2020-01-01',
     end_date: '2023-12-31',
@@ -24,6 +25,13 @@ const Dashboard = ({ onSubmit, isLoading }) => {
     monthly_withdrawal: 0
   });
 
+  // Update form data if initialData changes (e.g. loaded from library)
+  React.useEffect(() => {
+    if (initialData) {
+        setFormData(initialData);
+    }
+  }, [initialData]);
+
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     setFormData(prev => ({
@@ -37,8 +45,33 @@ const Dashboard = ({ onSubmit, isLoading }) => {
     onSubmit(formData);
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  const handleSaveStrategy = async () => {
+    if (!saveName) return;
+    setIsSaving(true);
+    try {
+        await axios.post('http://localhost:8000/api/strategies', {
+            name: saveName,
+            description: `Strategy for ${formData.equity_symbol} (${formData.start_date} - ${formData.end_date})`,
+            parameters: formData
+        });
+        setShowSaveModal(false);
+        setSaveName('');
+        alert('Strategy saved successfully!');
+    } catch (err) {
+        console.error(err);
+        alert('Failed to save strategy');
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow border border-gray-200">
+    <div className="space-y-6">
+    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow border border-gray-200 space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Core Strategy */}
@@ -163,7 +196,14 @@ const Dashboard = ({ onSubmit, isLoading }) => {
 
       </div>
 
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-between pt-4">
+        <button
+            type="button"
+            onClick={() => setShowSaveModal(true)}
+            className="inline-flex justify-center py-3 px-6 border border-gray-300 shadow-sm text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+            Save Strategy
+        </button>
         <button
           type="submit"
           disabled={isLoading}
@@ -173,6 +213,37 @@ const Dashboard = ({ onSubmit, isLoading }) => {
         </button>
       </div>
     </form>
+
+    {showSaveModal && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Save Strategy</h3>
+                <input
+                    type="text"
+                    placeholder="Strategy Name"
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    className="block w-full rounded-md border-gray-300 shadow-sm border p-2 mb-4"
+                />
+                <div className="flex justify-end space-x-3">
+                    <button
+                        onClick={() => setShowSaveModal(false)}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSaveStrategy}
+                        disabled={!saveName || isSaving}
+                        className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                        {isSaving ? 'Saving...' : 'Save'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )}
+    </div>
   );
 };
 

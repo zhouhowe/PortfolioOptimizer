@@ -30,8 +30,18 @@ class BacktestRequest(BaseModel):
     profit_limit_0m: float = Field(10.0, description="Profit limit for <3 months to expiration (%)")
     loss_limit_0m: float = Field(10.0, description="Loss limit for <3 months to expiration (%)")
     
+    # Wheel Strategy Parameters
+    use_wheel_strategy: bool = Field(False, description="Enable Wheel Strategy")
+    wheel_ma_short: int = Field(10, description="Short-term Moving Average window")
+    wheel_ma_long: int = Field(30, description="Long-term Moving Average window")
+    wheel_allocation: float = Field(0.0, description="Allocation for Wheel Strategy (uses cash portion)")
+
     # Cash Management
     monthly_withdrawal: float = Field(0.0, ge=0, description="Monthly cash withdrawal amount")
+    
+    # Simulation
+    use_simulation: bool = Field(False, description="Use synthetic data instead of historical")
+    simulation_scenario: str = Field("neutral", description="bull, bear, neutral, high_vol")
 
 class Trade(BaseModel):
     date: str
@@ -48,8 +58,10 @@ class PortfolioSnapshot(BaseModel):
     leap_value: float
     cash_value: float
     total_value: float
+    benchmark_value: float
     equity_price: float
     drawdown: float
+    greeks: Optional[Dict[str, float]] = None
 
 class BacktestResult(BaseModel):
     backtest_id: str

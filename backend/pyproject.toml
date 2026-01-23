@@ -11,6 +11,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "numpy>=2.4.1",
     "pandas>=2.3.3",
+    "peewee>=3.19.0",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
     "scipy>=1.17.0",

@@ -35,6 +35,14 @@ const Results = ({ results, onBack }) => {
         yAxisID: 'y',
       },
       {
+        label: 'Benchmark (Buy & Hold)',
+        data: results.history.map(h => h.benchmark_value),
+        borderColor: '#6B7280',
+        backgroundColor: 'rgba(107, 114, 128, 0.5)',
+        yAxisID: 'y',
+        borderDash: [2, 2],
+      },
+      {
         label: 'Drawdown (%)',
         data: results.history.map(h => h.drawdown * 100),
         borderColor: '#DC2626',
@@ -81,12 +89,31 @@ const Results = ({ results, onBack }) => {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Backtest Results</h2>
-        <button
-          onClick={onBack}
-          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-        >
-          Adjust Strategy
-        </button>
+        <div className="space-x-4">
+            <button
+            onClick={() => {
+                const csvContent = "data:text/csv;charset=utf-8," 
+                    + "Date,Type,Asset,Quantity,Price,Value,Reason\n"
+                    + results.trades.map(t => `${t.date},${t.type},${t.asset},${t.quantity},${t.price},${t.value},${t.reason}`).join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `backtest_results_${results.backtest_id}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+            Export CSV
+            </button>
+            <button
+            onClick={onBack}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+            >
+            Adjust Strategy
+            </button>
+        </div>
       </div>
 
       {/* Metrics Cards */}
@@ -121,6 +148,30 @@ const Results = ({ results, onBack }) => {
       <div className="bg-white p-4 rounded-lg shadow border border-gray-200 h-96">
         <Line options={options} data={chartData} />
       </div>
+
+      {/* Greeks Chart */}
+      {results.history[0].greeks && (
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200 h-96">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Greeks Exposure</h3>
+            <Line 
+                options={{
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { title: { display: false } },
+                    scales: { y: { display: true, title: { display: true, text: 'Value' } } }
+                }}
+                data={{
+                    labels: results.history.map(h => h.date),
+                    datasets: [
+                        { label: 'Delta', data: results.history.map(h => h.greeks.delta), borderColor: '#8884d8', fill: false },
+                        { label: 'Gamma', data: results.history.map(h => h.greeks.gamma), borderColor: '#82ca9d', fill: false },
+                        { label: 'Theta', data: results.history.map(h => h.greeks.theta), borderColor: '#ffc658', fill: false },
+                        { label: 'Vega', data: results.history.map(h => h.greeks.vega), borderColor: '#ff7300', fill: false },
+                    ]
+                }} 
+            />
+        </div>
+      )}
 
       {/* Trades Table */}
       <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">

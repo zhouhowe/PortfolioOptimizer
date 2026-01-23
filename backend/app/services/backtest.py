@@ -3,8 +3,10 @@ import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
 import uuid
+from scipy.stats import norm
 from app.models import BacktestRequest, BacktestResult, Trade, PortfolioSnapshot
-from app.services.option_pricing import black_scholes_call_price, find_strike_for_delta
+from app.services.option_pricing import black_scholes_call_price, find_strike_for_delta, black_scholes_put_price
+from app.services.simulator import MarketSimulator
 
 class LeapStrategyBacktester:
     def __init__(self, params: BacktestRequest):
@@ -12,7 +14,9 @@ class LeapStrategyBacktester:
         self.portfolio = {
             'cash': params.initial_capital,
             'equity_qty': 0,
-            'leap': None  # {strike, expiry_date, qty, entry_price, current_price}
+            'leap': None,  # {strike, expiry_date, qty, entry_price, current_price}
+            'wheel_put': None, # {strike, expiry_date, qty, entry_price, current_price}
+            'wheel_call': None # {strike, expiry_date, qty, entry_price, current_price}
         }
         self.trades = []
         self.history = []
@@ -21,20 +25,35 @@ class LeapStrategyBacktester:
         self.last_withdrawal_month = None
 
     def fetch_data(self):
+        # Simulation Mode
+        if self.params.use_simulation:
+            data = MarketSimulator.generate_scenario(
+                self.params.equity_symbol, 
+                self.params.start_date, 
+                self.params.end_date, 
+                self.params.simulation_scenario
+            )
+            close_prices = data['Close']
+            data['returns'] = close_prices.pct_change()
+            data['volatility'] = data['returns'].rolling(window=21).std() * np.sqrt(252)
+            
+             # Calculate Moving Averages for Wheel Strategy
+            if self.params.use_wheel_strategy:
+                data['ma_short'] = close_prices.rolling(window=self.params.wheel_ma_short).mean()
+                data['ma_long'] = close_prices.rolling(window=self.params.wheel_ma_long).mean()
+
+            data['volatility'] = data['volatility'].fillna(method='bfill').fillna(0.20)
+            return data
+
         # Add buffer for volatility calculation
         start_date_obj = datetime.strptime(self.params.start_date, "%Y-%m-%d")
-        buffer_date = start_date_obj - timedelta(days=60)
+        buffer_date = start_date_obj - timedelta(days=90) # Increased buffer for MA calculations
         
         data = yf.download(self.params.equity_symbol, start=buffer_date.strftime("%Y-%m-%d"), end=self.params.end_date, progress=False)
         
         if data.empty:
             raise ValueError(f"No data found for {self.params.equity_symbol}")
             
-        # Calculate daily returns and annualized volatility (21-day rolling window)
-        # Using 'Close' for calculations. Note: yfinance returns MultiIndex columns if not flattened in newer versions,
-        # but single ticker download usually returns simple columns or we access via simple key.
-        # Ensure we handle the Series correctly.
-        
         close_prices = data['Close']
         if isinstance(close_prices, pd.DataFrame):
              close_prices = close_prices.iloc[:, 0] # Take the first column if it's a DF
@@ -42,12 +61,85 @@ class LeapStrategyBacktester:
         data['returns'] = close_prices.pct_change()
         data['volatility'] = data['returns'].rolling(window=21).std() * np.sqrt(252)
         
+        # Calculate Moving Averages for Wheel Strategy
+        if self.params.use_wheel_strategy:
+            data['ma_short'] = close_prices.rolling(window=self.params.wheel_ma_short).mean()
+            data['ma_long'] = close_prices.rolling(window=self.params.wheel_ma_long).mean()
+        
         # Fill NaN volatility with mean or forward fill
         data['volatility'] = data['volatility'].fillna(method='bfill').fillna(0.20) # Default to 20% if no data
         
         # Filter back to requested start date
         mask = (data.index >= self.params.start_date)
         return data.loc[mask]
+
+    def _calculate_portfolio_greeks(self, date, stock_price, vol):
+        greeks = {'delta': 0.0, 'gamma': 0.0, 'theta': 0.0, 'vega': 0.0}
+        
+        # Helper for Call Greeks
+        def call_greeks(S, K, T, r, sigma):
+            if T <= 0: return 0, 0, 0, 0
+            d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
+            d2 = d1 - sigma*np.sqrt(T)
+            delta = norm.cdf(d1)
+            gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
+            theta = -(S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T)) - r * K * np.exp(-r*T) * norm.cdf(d2)
+            vega = S * norm.pdf(d1) * np.sqrt(T)
+            return delta, gamma, theta/365, vega/100
+            
+        # Helper for Put Greeks
+        def put_greeks(S, K, T, r, sigma):
+            if T <= 0: return 0, 0, 0, 0
+            d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
+            d2 = d1 - sigma*np.sqrt(T)
+            delta = norm.cdf(d1) - 1
+            gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
+            theta = -(S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T)) + r * K * np.exp(-r*T) * norm.cdf(-d2)
+            vega = S * norm.pdf(d1) * np.sqrt(T)
+            return delta, gamma, theta/365, vega/100
+
+        # Equity Delta
+        greeks['delta'] += self.portfolio['equity_qty']
+        
+        # LEAP Greeks
+        if self.portfolio['leap']:
+            leap = self.portfolio['leap']
+            days = (leap['expiry_date'] - date).days
+            T = days / 365.0
+            d, g, t, v = call_greeks(stock_price, leap['strike'], T, self.risk_free_rate, vol)
+            qty = leap['qty'] * 100
+            greeks['delta'] += d * qty
+            greeks['gamma'] += g * qty
+            greeks['theta'] += t * qty
+            greeks['vega'] += v * qty
+
+        # Wheel Put Greeks (Short)
+        if self.portfolio['wheel_put']:
+            put = self.portfolio['wheel_put']
+            days = (put['expiry_date'] - date).days
+            T = days / 365.0
+            d, g, t, v = put_greeks(stock_price, put['strike'], T, self.risk_free_rate, vol)
+            qty = put['qty'] * 100
+            # Short position -> flip signs
+            greeks['delta'] -= d * qty
+            greeks['gamma'] -= g * qty
+            greeks['theta'] -= t * qty
+            greeks['vega'] -= v * qty
+
+        # Wheel Call Greeks (Short)
+        if self.portfolio['wheel_call']:
+            call = self.portfolio['wheel_call']
+            days = (call['expiry_date'] - date).days
+            T = days / 365.0
+            d, g, t, v = call_greeks(stock_price, call['strike'], T, self.risk_free_rate, vol)
+            qty = call['qty'] * 100
+            # Short position
+            greeks['delta'] -= d * qty
+            greeks['gamma'] -= g * qty
+            greeks['theta'] -= t * qty
+            greeks['vega'] -= v * qty
+            
+        return greeks
 
     def run(self) -> BacktestResult:
         df = self.fetch_data()
@@ -64,28 +156,49 @@ class LeapStrategyBacktester:
             
             # 1. Update Portfolio Values
             self._update_leap_price(date, current_price, volatility)
+            self._update_wheel_prices(date, current_price, volatility)
             
             # 2. Check Logic
             self._check_monthly_withdrawal(date)
             self._check_leap_exit_conditions(date, current_price, volatility)
             self._check_rebalancing(date, current_price, volatility)
             
+            if self.params.use_wheel_strategy:
+                ma_short = float(row['ma_short'].iloc[0]) if isinstance(row['ma_short'], pd.Series) else float(row['ma_short'])
+                ma_long = float(row['ma_long'].iloc[0]) if isinstance(row['ma_long'], pd.Series) else float(row['ma_long'])
+                self._run_wheel_strategy(date, current_price, volatility, ma_short, ma_long)
+            
             # 3. Record Snapshot
             equity_val = self.portfolio['equity_qty'] * current_price
             leap_val = (self.portfolio['leap']['qty'] * self.portfolio['leap']['current_price'] * 100) if self.portfolio['leap'] else 0
-            total_val = self.portfolio['cash'] + equity_val + leap_val
+            
+            wheel_put_val = (self.portfolio['wheel_put']['qty'] * self.portfolio['wheel_put']['current_price'] * 100) if self.portfolio['wheel_put'] else 0
+            wheel_call_val = (self.portfolio['wheel_call']['qty'] * self.portfolio['wheel_call']['current_price'] * 100) if self.portfolio['wheel_call'] else 0
+            
+            total_val = self.portfolio['cash'] + equity_val + leap_val - wheel_put_val - wheel_call_val
             
             max_portfolio_value = max(max_portfolio_value, total_val)
             drawdown = (max_portfolio_value - total_val) / max_portfolio_value if max_portfolio_value > 0 else 0
             
+            # Benchmark (Buy & Hold) Calculation
+            if not hasattr(self, 'initial_equity_price'):
+                self.initial_equity_price = float(df.iloc[0]['Close'].iloc[0]) if isinstance(df.iloc[0]['Close'], pd.Series) else float(df.iloc[0]['Close'])
+            
+            benchmark_val = (self.params.initial_capital / self.initial_equity_price) * current_price
+            
+            # Greeks
+            greeks = self._calculate_portfolio_greeks(date, current_price, volatility)
+
             self.history.append(PortfolioSnapshot(
                 date=date.strftime("%Y-%m-%d"),
                 equity_value=round(equity_val, 2),
                 leap_value=round(leap_val, 2),
                 cash_value=round(self.portfolio['cash'], 2),
                 total_value=round(total_val, 2),
+                benchmark_value=round(benchmark_val, 2),
                 equity_price=round(current_price, 2),
-                drawdown=round(drawdown, 4)
+                drawdown=round(drawdown, 4),
+                greeks=greeks
             ))
 
         return self._generate_result(df)
@@ -345,6 +458,179 @@ class LeapStrategyBacktester:
             self._open_new_leap(date, stock_price, vol, target_leap_val)
 
         self.last_rebalance_price = stock_price
+
+    def _update_wheel_prices(self, date, stock_price, vol):
+        # Update Put Price
+        if self.portfolio['wheel_put']:
+            put = self.portfolio['wheel_put']
+            days = (put['expiry_date'] - date).days
+            T = days / 365.0
+            if T <= 0:
+                put['current_price'] = max(0, put['strike'] - stock_price)
+            else:
+                put['current_price'] = black_scholes_put_price(stock_price, put['strike'], T, self.risk_free_rate, vol)
+                
+        # Update Call Price
+        if self.portfolio['wheel_call']:
+            call = self.portfolio['wheel_call']
+            days = (call['expiry_date'] - date).days
+            T = days / 365.0
+            if T <= 0:
+                call['current_price'] = max(0, stock_price - call['strike'])
+            else:
+                call['current_price'] = black_scholes_call_price(stock_price, call['strike'], T, self.risk_free_rate, vol)
+
+    def _run_wheel_strategy(self, date, stock_price, vol, ma_short, ma_long):
+        # 1. Manage Existing Positions
+        self._manage_wheel_positions(date, stock_price)
+        
+        # 2. Open New Positions based on Signal
+        # Signal: MA Short > MA Long -> Bullish -> Sell Put
+        # Signal: MA Short < MA Long -> Bearish -> (If holding stock, Sell Call)
+        
+        if pd.isna(ma_short) or pd.isna(ma_long):
+            return
+            
+        is_bullish = ma_short > ma_long
+        
+        # Calculate available capital for Wheel (allocated from cash)
+        # Note: In real world, this uses margin. Here we use "wheel_allocation" from params, or just remaining cash?
+        # Params has `wheel_allocation`. Let's assume it's a fixed amount of cash reserved for this.
+        # But `wheel_allocation` is a float amount? No, typically a %.
+        # Let's check model.py -> `wheel_allocation: float` description "Allocation for Wheel Strategy (uses cash portion)"
+        # If it's 0, maybe we don't do it.
+        
+        wheel_capital = self.params.wheel_allocation 
+        if wheel_capital <= 0: return # Or use remaining cash?
+        
+        # Logic for Selling Put (Cash Secured Put)
+        if is_bullish and not self.portfolio['wheel_put']:
+            # Sell Put
+            # Strike: ATM or slightly OTM? Let's say 0.30 Delta OTM Put, or just 5% OTM?
+            # Simple rule: Strike = 95% of current price
+            strike = stock_price * 0.95
+            
+            # Expiry: 30 days
+            days_to_expiry = 30
+            expiry_date = date + timedelta(days=days_to_expiry)
+            T = days_to_expiry / 365.0
+            
+            price = black_scholes_put_price(stock_price, strike, T, self.risk_free_rate, vol)
+            
+            # Qty: Covered by wheel_capital
+            # Cost to cover = Strike * 100 * Qty
+            # Qty = wheel_capital / (Strike * 100)
+            
+            num_contracts = int(wheel_capital / (strike * 100))
+            if num_contracts > 0:
+                premium = num_contracts * 100 * price
+                self.portfolio['cash'] += premium
+                self.portfolio['wheel_put'] = {
+                    'strike': strike,
+                    'expiry_date': expiry_date,
+                    'qty': num_contracts,
+                    'entry_price': price,
+                    'current_price': price
+                }
+                self.trades.append(Trade(
+                    date=date.strftime("%Y-%m-%d"), type="SELL_OPEN", asset="PUT",
+                    quantity=num_contracts, price=price, value=premium,
+                    reason=f"Wheel: Sell Put (Bullish Signal)"
+                ))
+
+        # Logic for Selling Call (Covered Call)
+        # We need to hold the underlying to sell a covered call? 
+        # Or is this "Wheel" separate from the LEAP strategy?
+        # Usually Wheel implies you own the stock.
+        # In this combined app, we have 'equity_qty'. We can write calls against it.
+        
+        if not is_bullish and not self.portfolio['wheel_call'] and self.portfolio['equity_qty'] > 0:
+            # Sell Call
+            # Strike: 105% of current price
+            strike = stock_price * 1.05
+            
+            # Expiry: 30 days
+            days_to_expiry = 30
+            expiry_date = date + timedelta(days=days_to_expiry)
+            T = days_to_expiry / 365.0
+            
+            price = black_scholes_call_price(stock_price, strike, T, self.risk_free_rate, vol)
+            
+            # Qty: Covered by equity holdings
+            # Max contracts = equity_qty / 100
+            max_contracts = int(self.portfolio['equity_qty'] / 100)
+            
+            if max_contracts > 0:
+                premium = max_contracts * 100 * price
+                self.portfolio['cash'] += premium
+                self.portfolio['wheel_call'] = {
+                    'strike': strike,
+                    'expiry_date': expiry_date,
+                    'qty': max_contracts,
+                    'entry_price': price,
+                    'current_price': price
+                }
+                self.trades.append(Trade(
+                    date=date.strftime("%Y-%m-%d"), type="SELL_OPEN", asset="CALL",
+                    quantity=max_contracts, price=price, value=premium,
+                    reason=f"Wheel: Sell Call (Bearish Signal)"
+                ))
+
+    def _manage_wheel_positions(self, date, stock_price):
+        # Manage Put
+        if self.portfolio['wheel_put']:
+            put = self.portfolio['wheel_put']
+            days = (put['expiry_date'] - date).days
+            
+            if days <= 0:
+                # Expired
+                if stock_price < put['strike']:
+                    # Assigned! Buy stock at strike.
+                    cost = put['qty'] * 100 * put['strike']
+                    # Assuming we have the cash (secured)
+                    self.portfolio['cash'] -= cost
+                    self.portfolio['equity_qty'] += put['qty'] * 100
+                    
+                    self.trades.append(Trade(
+                        date=date.strftime("%Y-%m-%d"), type="ASSIGNED", asset="PUT",
+                        quantity=put['qty'], price=put['strike'], value=cost,
+                        reason="Put Assigned (Wheel)"
+                    ))
+                else:
+                    # Expired Worthless (Profit kept)
+                    self.trades.append(Trade(
+                        date=date.strftime("%Y-%m-%d"), type="EXPIRED", asset="PUT",
+                        quantity=put['qty'], price=0, value=0,
+                        reason="Put Expired Worthless (Wheel)"
+                    ))
+                self.portfolio['wheel_put'] = None
+
+        # Manage Call
+        if self.portfolio['wheel_call']:
+            call = self.portfolio['wheel_call']
+            days = (call['expiry_date'] - date).days
+            
+            if days <= 0:
+                # Expired
+                if stock_price > call['strike']:
+                    # Assigned! Sell stock at strike.
+                    proceeds = call['qty'] * 100 * call['strike']
+                    self.portfolio['equity_qty'] -= call['qty'] * 100
+                    self.portfolio['cash'] += proceeds
+                    
+                    self.trades.append(Trade(
+                        date=date.strftime("%Y-%m-%d"), type="ASSIGNED", asset="CALL",
+                        quantity=call['qty'], price=call['strike'], value=proceeds,
+                        reason="Call Assigned (Wheel)"
+                    ))
+                else:
+                    # Expired Worthless
+                    self.trades.append(Trade(
+                        date=date.strftime("%Y-%m-%d"), type="EXPIRED", asset="CALL",
+                        quantity=call['qty'], price=0, value=0,
+                        reason="Call Expired Worthless (Wheel)"
+                    ))
+                self.portfolio['wheel_call'] = None
 
     def _check_monthly_withdrawal(self, date):
         if self.params.monthly_withdrawal <= 0:

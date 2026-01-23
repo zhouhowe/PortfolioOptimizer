@@ -40,6 +40,19 @@ def black_scholes_call_price(S, K, T, r, sigma):
     call_price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
     return call_price
 
+def black_scholes_put_price(S, K, T, r, sigma):
+    """
+    Calculate Black-Scholes price for a put option.
+    """
+    if T <= 0:
+        return max(0, K - S)
+        
+    d1 = calculate_d1(S, K, T, r, sigma)
+    d2 = calculate_d2(d1, T, sigma)
+    
+    put_price = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+    return put_price
+
 def calculate_delta(S, K, T, r, sigma):
     """
     Calculate Delta for a call option.
