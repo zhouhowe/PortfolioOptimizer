@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Line } from 'react-chartjs-2';
+import FinancialChart from './FinancialChart';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -23,67 +24,6 @@ ChartJS.register(
 
 const Results = ({ results, onBack }) => {
   if (!results) return null;
-
-  const chartData = {
-    labels: results.history.map(h => h.date),
-    datasets: [
-      {
-        label: 'Portfolio Value ($)',
-        data: results.history.map(h => h.total_value),
-        borderColor: '#1E3A8A',
-        backgroundColor: 'rgba(30, 58, 138, 0.5)',
-        yAxisID: 'y',
-      },
-      {
-        label: 'Benchmark (Buy & Hold)',
-        data: results.history.map(h => h.benchmark_value),
-        borderColor: '#6B7280',
-        backgroundColor: 'rgba(107, 114, 128, 0.5)',
-        yAxisID: 'y',
-        borderDash: [2, 2],
-      },
-      {
-        label: 'Drawdown (%)',
-        data: results.history.map(h => h.drawdown * 100),
-        borderColor: '#DC2626',
-        backgroundColor: 'rgba(220, 38, 38, 0.5)',
-        yAxisID: 'y1',
-        borderDash: [5, 5],
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    interaction: {
-      mode: 'index',
-      intersect: false,
-    },
-    stacked: false,
-    plugins: {
-      title: {
-        display: true,
-        text: `Backtest Results: ${results.params.equity_symbol} (${results.params.start_date} to ${results.params.end_date})`,
-      },
-    },
-    scales: {
-      y: {
-        type: 'linear',
-        display: true,
-        position: 'left',
-        title: { display: true, text: 'Portfolio Value ($)' }
-      },
-      y1: {
-        type: 'linear',
-        display: true,
-        position: 'right',
-        grid: {
-          drawOnChartArea: false,
-        },
-        title: { display: true, text: 'Drawdown (%)' }
-      },
-    },
-  };
 
   return (
     <div className="space-y-8">
@@ -144,10 +84,12 @@ const Results = ({ results, onBack }) => {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="bg-white p-4 rounded-lg shadow border border-gray-200 h-96">
-        <Line options={options} data={chartData} />
-      </div>
+      {/* Financial Chart (Interactive) */}
+      <FinancialChart 
+        data={results.history} 
+        benchmarkData={results.history} 
+        equitySymbol={results.params.equity_symbol} 
+      />
 
       {/* Greeks Chart */}
       {results.history[0].greeks && (
@@ -158,15 +100,31 @@ const Results = ({ results, onBack }) => {
                     responsive: true,
                     interaction: { mode: 'index', intersect: false },
                     plugins: { title: { display: false } },
-                    scales: { y: { display: true, title: { display: true, text: 'Value' } } }
+                    scales: { 
+                        y: { display: true, title: { display: true, text: 'Value' } },
+                        x: { 
+                            ticks: { 
+                                autoSkip: true,
+                                maxTicksLimit: 10,
+                                maxRotation: 0 
+                            } 
+                        }
+                    },
+                    elements: {
+                        point: {
+                            radius: 0,
+                            hitRadius: 10,
+                            hoverRadius: 4
+                        }
+                    }
                 }}
                 data={{
                     labels: results.history.map(h => h.date),
                     datasets: [
-                        { label: 'Delta', data: results.history.map(h => h.greeks.delta), borderColor: '#8884d8', fill: false },
-                        { label: 'Gamma', data: results.history.map(h => h.greeks.gamma), borderColor: '#82ca9d', fill: false },
-                        { label: 'Theta', data: results.history.map(h => h.greeks.theta), borderColor: '#ffc658', fill: false },
-                        { label: 'Vega', data: results.history.map(h => h.greeks.vega), borderColor: '#ff7300', fill: false },
+                        { label: 'Delta', data: results.history.map(h => h.greeks.delta), borderColor: '#8884d8', fill: false, pointRadius: 0 },
+                        { label: 'Gamma', data: results.history.map(h => h.greeks.gamma), borderColor: '#82ca9d', fill: false, pointRadius: 0 },
+                        { label: 'Theta', data: results.history.map(h => h.greeks.theta), borderColor: '#ffc658', fill: false, pointRadius: 0 },
+                        { label: 'Vega', data: results.history.map(h => h.greeks.vega), borderColor: '#ff7300', fill: false, pointRadius: 0 },
                     ]
                 }} 
             />

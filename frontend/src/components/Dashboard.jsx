@@ -162,7 +162,7 @@ const Dashboard = ({ onSubmit, isLoading, initialData }) => {
           <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Profit/Loss Limits</h3>
           
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            <p className="col-span-2 text-sm font-medium text-gray-500">> 6 Months</p>
+            <p className="col-span-2 text-sm font-medium text-gray-500"> Over 6 Months</p>
             <div>
               <label className="block text-xs text-gray-500">Profit %</label>
               <input type="number" name="profit_limit_6m" value={formData.profit_limit_6m} onChange={handleChange} className="block w-full rounded-md border-gray-300 shadow-sm border p-1" />
