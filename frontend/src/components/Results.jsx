@@ -93,20 +93,26 @@ const Results = ({ results, onBack }) => {
 
       {/* Greeks Chart */}
       {results.history[0].greeks && (
-        <div className="bg-white p-4 rounded-lg shadow border border-gray-200 h-96">
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200 h-[600px]">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Greeks Exposure</h3>
             <Line 
                 options={{
                     responsive: true,
+                    maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
+                    layout: {
+                        padding: {
+                            bottom: 30,
+                            left: 10,
+                            right: 10
+                        }
+                    },
                     plugins: { title: { display: false } },
                     scales: { 
                         y: { display: true, title: { display: true, text: 'Value' } },
                         x: { 
                             ticks: { 
-                                autoSkip: true,
-                                maxTicksLimit: 10,
-                                maxRotation: 0 
+                                autoSkip: true
                             } 
                         }
                     },
