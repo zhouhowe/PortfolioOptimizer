@@ -53,10 +53,11 @@ const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
 
     // Add Portfolio Series (Area Chart for main focus)
     const portfolioSeries = chart.addSeries(AreaSeries, {
-      topColor: 'rgba(30, 58, 138, 0.4)',
+      topColor: 'rgba(30, 58, 138, 0.4)', // Indigo-800 with opacity
       bottomColor: 'rgba(30, 58, 138, 0.0)',
-      lineColor: '#1E3A8A',
+      lineColor: '#1E3A8A', // Indigo-900 (Dark Blue)
       lineWidth: 2,
+      title: 'Portfolio Value',
     });
     
     // Map data: { date: 'yyyy-mm-dd', total_value: number } -> { time: 'yyyy-mm-dd', value: number }
@@ -70,9 +71,10 @@ const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
     // Add Benchmark Series (Line Chart, comparison)
     if (benchmarkData) {
         const benchSeries = chart.addSeries(LineSeries, {
-            color: '#6B7280', // Gray
+            color: '#DC2626', // Red-600 (High contrast vs Blue)
             lineWidth: 2,
-            lineStyle: 2, // Dashed
+            lineStyle: 0, // Solid line for clarity
+            title: `Benchmark (${equitySymbol} Buy & Hold)`,
         });
         
         const benchChartData = benchmarkData.map(item => ({
@@ -83,6 +85,67 @@ const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
         benchmarkSeriesRef.current = benchSeries;
     }
 
+    // Legend
+    const legend = document.createElement('div');
+    legend.style.position = 'absolute';
+    legend.style.left = '12px';
+    legend.style.top = '12px';
+    legend.style.zIndex = 1;
+    legend.style.fontSize = '12px';
+    legend.style.lineHeight = '18px';
+    legend.style.fontWeight = '300';
+    legend.style.fontFamily = 'Inter, system-ui, sans-serif';
+    chartContainerRef.current.appendChild(legend);
+
+    const updateLegend = (param) => {
+        const validCrosshairPoint = !(
+            param === undefined || param.time === undefined || param.point.x < 0 || param.point.x > chartContainerRef.current.clientWidth || param.point.y < 0 || param.point.y > 400
+        );
+
+        let dateStr = '';
+        let portVal = '';
+        let benchVal = '';
+
+        if (validCrosshairPoint) {
+            const time = param.time;
+            dateStr = time.year + '-' + String(time.month).padStart(2, '0') + '-' + String(time.day).padStart(2, '0');
+            const portPrice = param.seriesData.get(portfolioSeries);
+            const benchPrice = param.seriesData.get(benchmarkSeriesRef.current);
+            portVal = portPrice !== undefined ? `$${portPrice.toFixed(2)}` : '';
+            benchVal = benchPrice !== undefined ? `$${benchPrice.toFixed(2)}` : '';
+        } else {
+            // Show last values
+            if (chartData.length > 0) {
+                const lastItem = chartData[chartData.length - 1];
+                dateStr = lastItem.time; // already string yyyy-mm-dd
+                portVal = `$${lastItem.value.toFixed(2)}`;
+                if (benchmarkSeriesRef.current) {
+                    // Need to get data from series, but series.data() is not directly accessible like array easily in API v4+ without helper?
+                    // We have the source data `benchmarkData`.
+                    const lastBench = benchmarkData[benchmarkData.length - 1];
+                    benchVal = `$${lastBench.benchmark_value.toFixed(2)}`;
+                }
+            }
+        }
+
+        legend.innerHTML = `
+            <div style="display: flex; gap: 16px;">
+                <div>${dateStr}</div>
+                <div style="color: #1E3A8A; font-weight: 600;">
+                    Portfolio: ${portVal}
+                </div>
+                ${benchVal ? `
+                <div style="color: #DC2626; font-weight: 600;">
+                    Benchmark: ${benchVal}
+                </div>
+                ` : ''}
+            </div>
+        `;
+    };
+
+    chart.subscribeCrosshairMove(updateLegend);
+    updateLegend(undefined); // Initial render
+
     // Fit Content
     chart.timeScale().fitContent();
 
@@ -91,6 +154,7 @@ const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
     return () => {
       window.removeEventListener('resize', handleResize);
       chart.remove();
+      if(legend && legend.parentNode) legend.parentNode.removeChild(legend);
     };
   }, [data, benchmarkData]); // Re-create on data change
 
@@ -152,7 +216,7 @@ const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
             ))}
         </div>
       </div>
-      <div ref={chartContainerRef} className="w-full h-96" />
+      <div ref={chartContainerRef} className="w-full h-96 relative" />
     </div>
   );
 };
