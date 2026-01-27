@@ -42,7 +42,7 @@ class LeapStrategyBacktester:
                 data['ma_short'] = close_prices.rolling(window=self.params.wheel_ma_short).mean()
                 data['ma_long'] = close_prices.rolling(window=self.params.wheel_ma_long).mean()
 
-            data['volatility'] = data['volatility'].fillna(method='bfill').fillna(0.20)
+            data['volatility'] = data['volatility'].bfill().fillna(0.20)
             return data
 
         # Add buffer for volatility calculation
@@ -67,7 +67,7 @@ class LeapStrategyBacktester:
             data['ma_long'] = close_prices.rolling(window=self.params.wheel_ma_long).mean()
         
         # Fill NaN volatility with mean or forward fill
-        data['volatility'] = data['volatility'].fillna(method='bfill').fillna(0.20) # Default to 20% if no data
+        data['volatility'] = data['volatility'].bfill().fillna(0.20) # Default to 20% if no data
         
         # Filter back to requested start date
         mask = (data.index >= self.params.start_date)
