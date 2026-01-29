@@ -21,7 +21,7 @@ class MonteCarloSimulator:
         # Run simulations
         for run in range(self.params.simulation_runs):
             # Create a copy of params for this run
-            run_params = self.params.copy()
+            run_params = self.params.model_copy()
             run_params.simulation_runs = 1  # Set to 1 for individual run
             
             # Generate custom scenario with specified drift and volatility

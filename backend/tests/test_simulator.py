@@ -66,3 +66,26 @@ def test_bear_scenario_returns():
     bear_ret = (df_bear['Close'].iloc[-1] / df_bear['Close'].iloc[0]) - 1
     
     assert bull_ret > bear_ret
+
+def test_generate_custom_scenario():
+    symbol = "TEST"
+    start_date = "2023-01-01"
+    end_date = "2023-12-31"
+    mu = 0.10  # 10% drift
+    sigma = 0.20 # 20% volatility
+    
+    df = MarketSimulator.generate_custom_scenario(symbol, start_date, end_date, mu, sigma)
+    
+    assert isinstance(df, pd.DataFrame)
+    assert not df.empty
+    assert "Close" in df.columns
+    assert len(df) > 0
+    
+    # Check if custom parameters affect outcome (simple check)
+    np.random.seed(42)
+    df_high_drift = MarketSimulator.generate_custom_scenario(symbol, start_date, end_date, 0.50, 0.20)
+    
+    np.random.seed(42)
+    df_low_drift = MarketSimulator.generate_custom_scenario(symbol, start_date, end_date, 0.0, 0.20)
+    
+    assert df_high_drift['Close'].iloc[-1] > df_low_drift['Close'].iloc[-1]
