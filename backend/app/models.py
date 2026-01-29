@@ -42,6 +42,9 @@ class BacktestRequest(BaseModel):
     # Simulation
     use_simulation: bool = Field(False, description="Use synthetic data instead of historical")
     simulation_scenario: str = Field("neutral", description="bull, bear, neutral, high_vol")
+    simulation_runs: int = Field(1, ge=1, le=1000, description="Number of Monte Carlo simulation runs")
+    simulation_drift: Optional[float] = Field(None, description="Expected annual drift (mu) for custom simulation")
+    simulation_volatility: Optional[float] = Field(None, description="Expected annual volatility (sigma) for custom simulation")
 
 class Trade(BaseModel):
     date: str
@@ -72,3 +75,9 @@ class BacktestResult(BaseModel):
     sharpe_ratio: float
     trades: List[Trade]
     history: List[PortfolioSnapshot]
+    
+    # Monte Carlo Results
+    confidence_intervals: Optional[Dict[str, Dict[str, float]]] = None  # {"portfolio": {"lower": 0.1, "upper": 0.9}, "benchmark": {"lower": 0.1, "upper": 0.9}}
+    final_portfolio_values: Optional[List[float]] = None  # For distribution chart
+    final_benchmark_values: Optional[List[float]] = None  # For distribution chart
+    is_simulation: bool = False  # Flag to indicate if this is a simulation result

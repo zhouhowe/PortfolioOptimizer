@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, AreaSeries, LineSeries } from 'lightweight-charts';
 
-const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
+const FinancialChart = ({ data, benchmarkData, equitySymbol, confidenceIntervals }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef();
   const portfolioSeriesRef = useRef();
@@ -50,6 +50,55 @@ const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
     });
 
     chartRef.current = chart;
+
+    // Add Confidence Intervals if available
+    if (confidenceIntervals) {
+        // Portfolio CI (Upper/Lower) - Light Blue Dashed
+        const portUpperSeries = chart.addSeries(LineSeries, {
+            color: 'rgba(30, 58, 138, 0.3)',
+            lineWidth: 1,
+            lineStyle: 2, // Dashed
+            title: 'Port 95% Upper',
+        });
+        const portLowerSeries = chart.addSeries(LineSeries, {
+            color: 'rgba(30, 58, 138, 0.3)',
+            lineWidth: 1,
+            lineStyle: 2, // Dashed
+            title: 'Port 95% Lower',
+        });
+        
+        portUpperSeries.setData(data.map((item, i) => ({
+            time: item.date,
+            value: confidenceIntervals.portfolio.upper[i]
+        })));
+        portLowerSeries.setData(data.map((item, i) => ({
+            time: item.date,
+            value: confidenceIntervals.portfolio.lower[i]
+        })));
+
+        // Benchmark CI (Upper/Lower) - Light Red Dashed
+        const benchUpperSeries = chart.addSeries(LineSeries, {
+            color: 'rgba(220, 38, 38, 0.3)',
+            lineWidth: 1,
+            lineStyle: 2, // Dashed
+            title: 'Bench 95% Upper',
+        });
+        const benchLowerSeries = chart.addSeries(LineSeries, {
+            color: 'rgba(220, 38, 38, 0.3)',
+            lineWidth: 1,
+            lineStyle: 2, // Dashed
+            title: 'Bench 95% Lower',
+        });
+
+        benchUpperSeries.setData(data.map((item, i) => ({
+            time: item.date,
+            value: confidenceIntervals.benchmark.upper[i]
+        })));
+        benchLowerSeries.setData(data.map((item, i) => ({
+            time: item.date,
+            value: confidenceIntervals.benchmark.lower[i]
+        })));
+    }
 
     // Add Portfolio Series (Area Chart for main focus)
     const portfolioSeries = chart.addSeries(AreaSeries, {
@@ -156,7 +205,7 @@ const FinancialChart = ({ data, benchmarkData, equitySymbol }) => {
       chart.remove();
       if(legend && legend.parentNode) legend.parentNode.removeChild(legend);
     };
-  }, [data, benchmarkData]); // Re-create on data change
+  }, [data, benchmarkData, confidenceIntervals]); // Re-create on data change
 
   const setTimeRange = (months) => {
     if (!chartRef.current || !data || data.length === 0) return;

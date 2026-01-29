@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.models import BacktestRequest, BacktestResult
 from app.services.backtest import LeapStrategyBacktester
+from app.services.monte_carlo import MonteCarloSimulator
 from app.database import Strategy, init_db
 from app.schemas import StrategyCreate, StrategyResponse
 import traceback
@@ -14,8 +15,12 @@ init_db()
 @router.post("/backtest/run", response_model=BacktestResult)
 async def run_backtest(request: BacktestRequest):
     try:
-        backtester = LeapStrategyBacktester(request)
-        result = backtester.run()
+        if request.use_simulation and request.simulation_runs > 1:
+            simulator = MonteCarloSimulator(request)
+            result = simulator.run_monte_carlo()
+        else:
+            backtester = LeapStrategyBacktester(request)
+            result = backtester.run()
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

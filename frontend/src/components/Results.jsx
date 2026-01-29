@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 import FinancialChart from './FinancialChart';
 import {
   Chart as ChartJS,
@@ -7,6 +7,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -17,6 +18,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend
@@ -24,6 +26,46 @@ ChartJS.register(
 
 const Results = ({ results, onBack }) => {
   if (!results) return null;
+
+  // Calculate Distribution Data if simulation
+  const getDistributionData = () => {
+    if (!results.final_portfolio_values || results.final_portfolio_values.length === 0) return null;
+    
+    const values = results.final_portfolio_values;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const bins = 20;
+    const step = (max - min) / bins;
+    
+    const histogram = new Array(bins).fill(0);
+    const labels = [];
+    
+    for (let i = 0; i < bins; i++) {
+        const binStart = min + i * step;
+        const binEnd = min + (i + 1) * step;
+        labels.push(`${(binStart/1000).toFixed(1)}k - ${(binEnd/1000).toFixed(1)}k`);
+    }
+    
+    values.forEach(v => {
+        const binIndex = Math.min(Math.floor((v - min) / step), bins - 1);
+        histogram[binIndex]++;
+    });
+    
+    return {
+        labels,
+        datasets: [
+            {
+                label: 'Frequency',
+                data: histogram,
+                backgroundColor: 'rgba(79, 70, 229, 0.5)',
+                borderColor: 'rgba(79, 70, 229, 1)',
+                borderWidth: 1,
+            }
+        ]
+    };
+  };
+
+  const distributionData = getDistributionData();
 
   return (
     <div className="space-y-8">
@@ -88,11 +130,34 @@ const Results = ({ results, onBack }) => {
       <FinancialChart 
         data={results.history} 
         benchmarkData={results.history} 
-        equitySymbol={results.params.equity_symbol} 
+        equitySymbol={results.params.equity_symbol}
+        confidenceIntervals={results.confidence_intervals}
       />
 
-      {/* Greeks Chart */}
-      {results.history[0].greeks && (
+      {/* Distribution Chart (Simulation Only) */}
+      {distributionData && (
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200 h-[400px]">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Final Portfolio Value Distribution</h3>
+            <Bar 
+                options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        title: { display: false }
+                    },
+                    scales: {
+                        y: { title: { display: true, text: 'Frequency' } },
+                        x: { title: { display: true, text: 'Portfolio Value ($)' } }
+                    }
+                }}
+                data={distributionData} 
+            />
+        </div>
+      )}
+
+      {/* Greeks Chart (Historical Only) */}
+      {results.history[0].greeks && !results.is_simulation && (
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200 h-[600px]">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Greeks Exposure</h3>
             <Line 

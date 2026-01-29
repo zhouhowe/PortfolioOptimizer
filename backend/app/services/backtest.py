@@ -143,6 +143,15 @@ class LeapStrategyBacktester:
 
     def run(self) -> BacktestResult:
         df = self.fetch_data()
+        return self._run_with_df(df)
+    
+    def run_with_data(self, df: pd.DataFrame) -> BacktestResult:
+        """
+        Run backtest with pre-fetched data (used for Monte Carlo simulations).
+        """
+        return self._run_with_df(df)
+    
+    def _run_with_df(self, df: pd.DataFrame) -> BacktestResult:
         
         # Initial Setup
         first_row = df.iloc[0]

@@ -36,7 +36,11 @@ const Dashboard = ({ onSubmit, isLoading, initialData }) => {
     loss_limit_3m: 20,
     profit_limit_0m: 10,
     loss_limit_0m: 10,
-    monthly_withdrawal: 0
+    monthly_withdrawal: 0,
+    use_simulation: false,
+    simulation_runs: 100,
+    simulation_drift: 0.08,
+    simulation_volatility: 0.20
   });
 
   // Update form data if initialData changes (e.g. loaded from library)
@@ -115,6 +119,75 @@ const Dashboard = ({ onSubmit, isLoading, initialData }) => {
           <div>
             <LabelWithTooltip label="Initial Capital ($)" description="Starting cash amount for the portfolio." />
             <input type="number" name="initial_capital" value={formData.initial_capital} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" required />
+          </div>
+
+          {/* Data Source Selection */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Data Source</h3>
+            
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="use_simulation"
+                  value={false}
+                  checked={!formData.use_simulation}
+                  onChange={(e) => setFormData(prev => ({ ...prev, use_simulation: false }))}
+                  className="mr-2"
+                />
+                Historical Data
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="use_simulation"
+                  value={true}
+                  checked={formData.use_simulation}
+                  onChange={(e) => setFormData(prev => ({ ...prev, use_simulation: true }))}
+                  className="mr-2"
+                />
+                Simulated Data
+              </label>
+            </div>
+
+            {formData.use_simulation && (
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <LabelWithTooltip label="Expected Drift (%)" description="Expected annual return percentage for simulation." />
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    name="simulation_drift" 
+                    value={formData.simulation_drift * 100} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, simulation_drift: parseFloat(e.target.value) / 100 }))} 
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" 
+                  />
+                </div>
+                <div>
+                  <LabelWithTooltip label="Volatility (%)" description="Expected annual volatility percentage for simulation." />
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    name="simulation_volatility" 
+                    value={formData.simulation_volatility * 100} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, simulation_volatility: parseFloat(e.target.value) / 100 }))} 
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" 
+                  />
+                </div>
+                <div>
+                  <LabelWithTooltip label="Simulation Runs" description="Number of Monte Carlo simulations to run." />
+                  <input 
+                    type="number" 
+                    name="simulation_runs" 
+                    value={formData.simulation_runs} 
+                    onChange={handleChange} 
+                    min="1" 
+                    max="1000" 
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" 
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -28,25 +28,30 @@ graph TD
 
 ## 2. Technology Description
 
-- **Frontend**: React@18 + Vite + TailwindCSS@3 + Chart.js@4
-- **Initialization Tool**: vite-init
-- **Backend**: FastAPI@0.104 (Python)
-- **Database**: Supabase (PostgreSQL)
-- **Data Sources**: yfinance for equity data, Black-Scholes model for option pricing
-- **Key Dependencies**: pandas, numpy, scipy, yfinance, supabase-py, fastapi-cors
+* **Frontend**: React\@18 + Vite + TailwindCSS\@3 + Chart.js\@4
+
+* **Initialization Tool**: vite-init
+
+* **Backend**: FastAPI\@0.104 (Python)
+
+* **Database**: Supabase (PostgreSQL)
+
+* **Data Sources**: yfinance for equity data, Black-Scholes model for option pricing
+
+* **Key Dependencies**: pandas, numpy, scipy, yfinance, supabase-py, fastapi-cors
 
 ## 3. Route Definitions
 
-| Route | Purpose |
-|-------|---------|
-| / | Dashboard page with strategy configuration |
-| /backtest | Backtest results and performance analysis |
-| /strategies | Strategy library and comparison tools |
-| /api/backtest/run | Execute backtest with provided parameters |
-| /api/backtest/results/{id} | Retrieve backtest results by ID |
-| /api/strategies | CRUD operations for saved strategies |
-| /api/equity/data | Fetch historical equity data |
-| /api/options/pricing | Calculate option prices using Black-Scholes |
+| Route                      | Purpose                                     |
+| -------------------------- | ------------------------------------------- |
+| /                          | Dashboard page with strategy configuration  |
+| /backtest                  | Backtest results and performance analysis   |
+| /strategies                | Strategy library and comparison tools       |
+| /api/backtest/run          | Execute backtest with provided parameters   |
+| /api/backtest/results/{id} | Retrieve backtest results by ID             |
+| /api/strategies            | CRUD operations for saved strategies        |
+| /api/equity/data           | Fetch historical equity data                |
+| /api/options/pricing       | Calculate option prices using Black-Scholes |
 
 ## 4. API Definitions
 
@@ -57,36 +62,39 @@ POST /api/backtest/run
 ```
 
 Request:
-| Param Name | Param Type | isRequired | Description |
-|------------|------------|------------|-------------|
-| equity_symbol | string | true | Target equity symbol (QQQ, TSLA) |
-| start_date | string | true | Backtest start date (YYYY-MM-DD) |
-| end_date | string | true | Backtest end date (YYYY-MM-DD) |
-| initial_capital | number | true | Initial portfolio value in USD |
-| equity_allocation | number | true | Percentage allocation to equity (0-100) |
-| leap_allocation | number | true | Percentage allocation to LEAP calls (0-100) |
-| leap_delta | number | true | Target delta for LEAP options (0.5-0.8) |
-| leap_expiration_months | number | true | LEAP expiration timeframe (12-18) |
-| rebalance_delta | number | false | Allocation deviation trigger (%) |
-| equity_down_trigger | number | false | Equity price drop trigger (%) |
-| equity_up_trigger | number | false | Equity price rise trigger (%) |
-| profit_limit_6m | number | false | Profit limit for >6 months to expiration |
-| loss_limit_6m | number | false | Loss limit for >6 months to expiration |
-| profit_limit_3m | number | false | Profit limit for 3-6 months to expiration |
-| loss_limit_3m | number | false | Loss limit for 3-6 months to expiration |
-| profit_limit_0m | number | false | Profit limit for <3 months to expiration |
-| loss_limit_0m | number | false | Loss limit for <3 months to expiration |
-| monthly_withdrawal | number | false | Monthly cash withdrawal amount |
+
+| Param Name               | Param Type | isRequired | Description                                 |
+| ------------------------ | ---------- | ---------- | ------------------------------------------- |
+| equity\_symbol           | string     | true       | Target equity symbol (QQQ, TSLA)            |
+| start\_date              | string     | true       | Backtest start date (YYYY-MM-DD)            |
+| end\_date                | string     | true       | Backtest end date (YYYY-MM-DD)              |
+| initial\_capital         | number     | true       | Initial portfolio value in USD              |
+| equity\_allocation       | number     | true       | Percentage allocation to equity (0-100)     |
+| leap\_allocation         | number     | true       | Percentage allocation to LEAP calls (0-100) |
+| leap\_delta              | number     | true       | Target delta for LEAP options (0.5-0.8)     |
+| leap\_expiration\_months | number     | true       | LEAP expiration timeframe (12-18)           |
+| rebalance\_delta         | number     | false      | Allocation deviation trigger (%)            |
+| equity\_down\_trigger    | number     | false      | Equity price drop trigger (%)               |
+| equity\_up\_trigger      | number     | false      | Equity price rise trigger (%)               |
+| profit\_limit\_6m        | number     | false      | Profit limit for >6 months to expiration    |
+| loss\_limit\_6m          | number     | false      | Loss limit for >6 months to expiration      |
+| profit\_limit\_3m        | number     | false      | Profit limit for 3-6 months to expiration   |
+| loss\_limit\_3m          | number     | false      | Loss limit for 3-6 months to expiration     |
+| profit\_limit\_0m        | number     | false      | Profit limit for <3 months to expiration    |
+| loss\_limit\_0m          | number     | false      | Loss limit for <3 months to expiration      |
+| monthly\_withdrawal      | number     | false      | Monthly cash withdrawal amount              |
 
 Response:
-| Param Name | Param Type | Description |
-|------------|------------|-------------|
-| backtest_id | string | Unique identifier for the backtest |
-| status | string | Execution status (running, completed, failed) |
-| progress | number | Completion percentage (0-100) |
-| results_url | string | Endpoint to retrieve full results |
+
+| Param Name   | Param Type | Description                                   |
+| ------------ | ---------- | --------------------------------------------- |
+| backtest\_id | string     | Unique identifier for the backtest            |
+| status       | string     | Execution status (running, completed, failed) |
+| progress     | number     | Completion percentage (0-100)                 |
+| results\_url | string     | Endpoint to retrieve full results             |
 
 Example:
+
 ```json
 {
   "equity_symbol": "QQQ",
@@ -113,21 +121,23 @@ GET /api/strategies
 ```
 
 Response:
-| Param Name | Param Type | Description |
-|------------|------------|-------------|
-| strategies | array | List of saved strategy configurations |
-| total_count | number | Total number of strategies |
+
+| Param Name   | Param Type | Description                           |
+| ------------ | ---------- | ------------------------------------- |
+| strategies   | array      | List of saved strategy configurations |
+| total\_count | number     | Total number of strategies            |
 
 ```
 POST /api/strategies/save
 ```
 
 Request:
-| Param Name | Param Type | isRequired | Description |
-|------------|------------|------------|-------------|
-| name | string | true | Strategy name |
-| description | string | false | Strategy description |
-| parameters | object | true | Complete strategy parameter object |
+
+| Param Name  | Param Type | isRequired | Description                        |
+| ----------- | ---------- | ---------- | ---------------------------------- |
+| name        | string     | true       | Strategy name                      |
+| description | string     | false      | Strategy description               |
+| parameters  | object     | true       | Complete strategy parameter object |
 
 ## 5. Server Architecture Diagram
 
@@ -333,3 +343,4 @@ GRANT ALL PRIVILEGES ON trades TO authenticated;
 GRANT SELECT ON portfolio_snapshots TO anon;
 GRANT ALL PRIVILEGES ON portfolio_snapshots TO authenticated;
 ```
+
