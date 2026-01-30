@@ -23,8 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
-
+# Cache files
 __pycache__
 venv
 venv/*
 __marimo__
+
+# DB file
+*.db
