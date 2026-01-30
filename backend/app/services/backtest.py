@@ -18,6 +18,10 @@ class LeapStrategyBacktester:
             'wheel_put': None, # {strike, expiry_date, qty, entry_price, current_price}
             'wheel_call': None # {strike, expiry_date, qty, entry_price, current_price}
         }
+        self.benchmark = {
+            'shares': 0,
+            'cash': 0
+        }
         self.trades = []
         self.history = []
         self.risk_free_rate = 0.04  # 4% assumption
@@ -168,7 +172,7 @@ class LeapStrategyBacktester:
             self._update_wheel_prices(date, current_price, volatility)
             
             # 2. Check Logic
-            self._check_monthly_withdrawal(date)
+            self._check_monthly_withdrawal(date, current_price)
             self._check_leap_exit_conditions(date, current_price, volatility)
             self._check_rebalancing(date, current_price, volatility)
             
@@ -190,10 +194,7 @@ class LeapStrategyBacktester:
             drawdown = (max_portfolio_value - total_val) / max_portfolio_value if max_portfolio_value > 0 else 0
             
             # Benchmark (Buy & Hold) Calculation
-            if not hasattr(self, 'initial_equity_price'):
-                self.initial_equity_price = float(df.iloc[0]['Close'].iloc[0]) if isinstance(df.iloc[0]['Close'], pd.Series) else float(df.iloc[0]['Close'])
-            
-            benchmark_val = (self.params.initial_capital / self.initial_equity_price) * current_price
+            benchmark_val = self.benchmark['shares'] * current_price
             
             # Greeks
             greeks = self._calculate_portfolio_greeks(date, current_price, volatility)
@@ -217,6 +218,10 @@ class LeapStrategyBacktester:
         vol = float(row['volatility'].iloc[0]) if isinstance(row['volatility'], pd.Series) else float(row['volatility'])
         
         total_capital = self.portfolio['cash']
+        
+        # Initialize Benchmark: Buy and Hold
+        self.benchmark['shares'] = total_capital / price
+        self.benchmark['cash'] = 0.0
         
         target_equity = total_capital * (self.params.equity_allocation / 100)
         target_leap = total_capital * (self.params.leap_allocation / 100)
@@ -641,7 +646,7 @@ class LeapStrategyBacktester:
                     ))
                 self.portfolio['wheel_call'] = None
 
-    def _check_monthly_withdrawal(self, date):
+    def _check_monthly_withdrawal(self, date, current_price):
         if self.params.monthly_withdrawal <= 0:
             return
             
@@ -649,6 +654,8 @@ class LeapStrategyBacktester:
         if self.last_withdrawal_month != current_month:
             # Withdraw
             amount = self.params.monthly_withdrawal
+            
+            # Portfolio Withdrawal
             if self.portfolio['cash'] >= amount:
                 self.portfolio['cash'] -= amount
                 self.trades.append(Trade(
@@ -664,6 +671,11 @@ class LeapStrategyBacktester:
                     date=date.strftime("%Y-%m-%d"), type="WITHDRAW", asset="CASH",
                     quantity=1, price=amount, value=amount, reason="Monthly Spending (Margin)"
                 ))
+            
+            # Benchmark Withdrawal (Sell Shares to Cover)
+            if self.benchmark['shares'] > 0:
+                shares_to_sell = amount / current_price
+                self.benchmark['shares'] -= shares_to_sell
             
             self.last_withdrawal_month = current_month
 
