@@ -61,7 +61,7 @@ const StrategyLibrary = ({ onLoadStrategy }) => {
                 </h3>
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => onLoadStrategy(strategy.parameters)}
+                    onClick={() => onLoadStrategy(strategy)}
                     className="p-1 text-blue-600 hover:text-blue-800"
                     title="Load Strategy"
                   >

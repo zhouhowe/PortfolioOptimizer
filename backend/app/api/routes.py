@@ -59,6 +59,32 @@ async def create_strategy(strategy: StrategyCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/strategies/{id}", response_model=StrategyResponse)
+async def update_strategy(id: int, strategy: StrategyCreate):
+    try:
+        # Check if strategy exists
+        existing_strategy = Strategy.get_or_none(Strategy.id == id)
+        if not existing_strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+        
+        # Update the strategy
+        existing_strategy.name = strategy.name
+        existing_strategy.description = strategy.description
+        existing_strategy.parameters = json.dumps(strategy.parameters)
+        existing_strategy.save()
+        
+        return StrategyResponse(
+            id=existing_strategy.id,
+            name=existing_strategy.name,
+            description=existing_strategy.description,
+            parameters=strategy.parameters,
+            created_at=str(existing_strategy.created_at)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/strategies/{id}")
 async def delete_strategy(id: int):
     try:

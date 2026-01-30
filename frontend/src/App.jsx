@@ -10,6 +10,7 @@ function App() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, library
   const [loadedStrategy, setLoadedStrategy] = useState(null);
+  const [loadedStrategyId, setLoadedStrategyId] = useState(null);
 
   const handleRunBacktest = async (params) => {
     setIsLoading(true);
@@ -30,10 +31,27 @@ function App() {
     setError(null);
   };
 
-  const handleLoadStrategy = (params) => {
-    setLoadedStrategy(params);
+  const handleLoadStrategy = (strategy) => {
+    setLoadedStrategy(strategy.parameters);
+    setLoadedStrategyId(strategy.id);
     setActiveTab('dashboard');
     handleReset();
+  };
+
+  const handleSaveToSameStrategy = async (formData) => {
+    if (!loadedStrategyId) return;
+    
+    try {
+      await axios.put(`http://localhost:8000/api/strategies/${loadedStrategyId}`, {
+        name: formData.equity_symbol + ' Strategy',
+        description: `Updated strategy for ${formData.equity_symbol} (${formData.start_date} - ${formData.end_date})`,
+        parameters: formData
+      });
+      alert('Strategy updated successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update strategy');
+    }
   };
 
   return (
@@ -71,7 +89,13 @@ function App() {
           {activeTab === 'library' ? (
             <StrategyLibrary onLoadStrategy={handleLoadStrategy} />
           ) : !results ? (
-            <Dashboard onSubmit={handleRunBacktest} isLoading={isLoading} initialData={loadedStrategy} />
+            <Dashboard 
+              onSubmit={handleRunBacktest} 
+              isLoading={isLoading} 
+              initialData={loadedStrategy}
+              loadedStrategyId={loadedStrategyId}
+              onSaveToSameStrategy={handleSaveToSameStrategy}
+            />
           ) : (
             <Results results={results} onBack={handleReset} />
           )}
