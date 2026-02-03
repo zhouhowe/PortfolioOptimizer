@@ -18,7 +18,7 @@ import seaborn as sns
 from typing import List, Dict, Any, Tuple
 
 # Add the backend directory to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 from app.models import BacktestRequest
 from app.services.backtest import LeapStrategyBacktester
@@ -188,7 +188,7 @@ class StrategyExperimentWithCharts:
         
         return df
     
-    def create_charts(self, results_df: pd.DataFrame, output_dir: str = 'charts'):
+    def create_charts(self, results_df: pd.DataFrame, output_dir: str = 'experiments/charts'):
         """Create bar charts comparing baseline vs all scenarios"""
         
         # Create output directory
@@ -284,7 +284,7 @@ class StrategyExperimentWithCharts:
             # Create separate focused charts
             self.create_focused_charts(symbol_data, symbol, output_dir)
     
-    def create_focused_charts(self, symbol_data: pd.DataFrame, symbol: str, output_dir: str):
+    def create_focused_charts(self, symbol_data: pd.DataFrame, symbol: str, output_dir: str = 'experiments/charts'):
         """Create focused charts for total return and max drawdown separately"""
         
         # Chart 1: Total Return Focus
@@ -392,7 +392,7 @@ def main():
     
     # Save results
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    results_file = f'experiment_results_with_charts_{timestamp}.csv'
+    results_file = f'experiments/experiment_results_with_charts_{timestamp}.csv'
     results_df.to_csv(results_file, index=False)
     print(f"\nResults saved to {results_file}")
     
@@ -407,7 +407,7 @@ def main():
         print(f"Best Sharpe ratio: {successful['sharpe_ratio'].max():.3f}")
         print(f"Lowest drawdown: {successful['max_drawdown'].min():.1f}%")
     
-    print(f"\nCharts saved to charts/ directory")
+    print(f"\nCharts saved to experiments/charts directory")
 
 if __name__ == "__main__":
     main()

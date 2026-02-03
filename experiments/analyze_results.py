@@ -7,13 +7,27 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import sys
 import os
+
+# Add the backend directory to Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 def analyze_results():
     """Analyze the experiment results and create summary"""
     
-    # Find the latest results file
+    # Find the latest results file in experiments directory
     results_files = [f for f in os.listdir('.') if f.startswith('experiment_results_with_charts_') and f.endswith('.csv')]
+    if not results_files:
+        # Also check the parent directory for older results
+        parent_files = [f for f in os.listdir('..') if f.startswith('experiment_results_with_charts_') and f.endswith('.csv')]
+        if parent_files:
+            # Move parent files to current directory if needed
+            for f in parent_files:
+                if not os.path.exists(f):
+                    os.rename(os.path.join('..', f), f)
+            results_files = [f for f in os.listdir('.') if f.startswith('experiment_results_with_charts_') and f.endswith('.csv')]
+    
     if not results_files:
         print("No results file found!")
         return

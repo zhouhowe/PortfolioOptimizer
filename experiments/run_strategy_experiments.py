@@ -17,7 +17,7 @@ import sys
 import os
 
 # Add the backend directory to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 from app.models import BacktestRequest
 from app.services.backtest import LeapStrategyBacktester
